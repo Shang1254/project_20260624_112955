@@ -71,11 +71,16 @@ export default function AIAssistantPage() {
     setIsLoading(true);
 
     try {
+      // 获取 session token
+      const supabase = await getSupabaseBrowserClientWithRetry();
+      const { data: { session } } = await supabase.auth.getSession();
+
       // 调用后端AI接口
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(session ? { 'x-session': session.access_token } : {}),
         },
         body: JSON.stringify({
           message: userMessage.content,
@@ -139,10 +144,10 @@ export default function AIAssistantPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="max-w-4xl mx-auto w-full flex flex-col flex-1">
         {/* Header */}
-        <div className="bg-white border-b px-4 py-4 flex items-center gap-4">
+        <div className="bg-white border-b px-4 py-4 flex items-center gap-4 shrink-0">
           <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             返回
@@ -159,7 +164,7 @@ export default function AIAssistantPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="px-4 py-3 bg-white border-b">
+        <div className="px-4 py-3 bg-white border-b shrink-0">
           <div className="flex gap-2">
             {quickActions.map((action, idx) => (
               <Button
@@ -178,7 +183,7 @@ export default function AIAssistantPage() {
         {/* Chat Area */}
         <div 
           ref={scrollRef}
-          className="h-[calc(100vh-280px)] overflow-y-auto px-4 py-6 space-y-4"
+          className="flex-1 overflow-y-auto px-4 py-6 space-y-4"
         >
           {messages.length === 0 && (
             <Card className="bg-gray-100">
@@ -200,7 +205,7 @@ export default function AIAssistantPage() {
               }`}
             >
               {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
                   <Bot className="w-4 h-4 text-white" />
                 </div>
               )}
@@ -216,7 +221,7 @@ export default function AIAssistantPage() {
               </Card>
 
               {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
                   <User className="w-4 h-4 text-white" />
                 </div>
               )}
@@ -238,7 +243,7 @@ export default function AIAssistantPage() {
         </div>
 
         {/* Input Area */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-4 max-w-4xl mx-auto">
+        <div className="bg-white border-t px-4 py-4 shrink-0">
           <form onSubmit={sendMessage} className="flex gap-2">
             <Input
               placeholder="输入您的问题..."

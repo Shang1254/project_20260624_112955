@@ -10,27 +10,27 @@ export default function Home() {
   const router = useRouter();
   const { isLoading, error } = useSupabaseConfig();
 
-  const checkAuth = async () => {
-    try {
-      const supabase = await getSupabaseBrowserClientWithRetry();
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        router.push('/dashboard');
-      } else {
+  useEffect(() => {
+    if (isLoading || error) return;
+
+    const checkAuth = async () => {
+      try {
+        const supabase = await getSupabaseBrowserClientWithRetry();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          router.push('/dashboard');
+        } else {
+          router.push('/login');
+        }
+      } catch (err) {
+        console.error('Auth check error:', err);
         router.push('/login');
       }
-    } catch (err) {
-      console.error('Auth check error:', err);
-      router.push('/login');
-    }
-  };
+    };
 
-  useEffect(() => {
-    if (!isLoading && !error) {
-      checkAuth();
-    }
-  }, [isLoading, error]);
+    checkAuth();
+  }, [isLoading, error, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50">
@@ -39,7 +39,8 @@ export default function Home() {
           <GraduationCap className="w-10 h-10 text-white" />
         </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">智能班级管理系统</h1>
-        <p className="text-gray-600 mb-6">正在检查登录状态...</p>
+        <p className="text-gray-600 mb-1">武汉晴川学院</p>
+        <p className="text-gray-500 mb-6 text-sm">正在检查登录状态...</p>
         <div className="flex justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>

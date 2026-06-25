@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, CheckCircle2, XCircle, FileText, AlertCircle, Eye } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SubmissionFile {
   name: string;
@@ -117,14 +118,14 @@ export default function ReviewSubmissionsPage() {
   };
 
   const handleApprove = async (submission: Submission) => {
-    if (!confirm(`确定要通过 "${submission.users.name}" 的提交吗？`)) return;
+    const studentName = submission.users.name;
 
     try {
       const supabase = await getSupabaseBrowserClientWithRetry();
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        setError('用户未登录');
+        toast.error('用户未登录');
         return;
       }
 
@@ -141,13 +142,11 @@ export default function ReviewSubmissionsPage() {
 
       if (error) throw new Error(error.message);
 
-      setSuccess('已通过提交');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      toast.success(`已通过 "${studentName}" 的提交`);
+      await loadSubmissions();
     } catch (err: unknown) {
       console.error('Approve error:', err);
-      setError(err instanceof Error ? err.message : '操作失败');
+      toast.error(err instanceof Error ? err.message : '操作失败');
     }
   };
 
@@ -159,7 +158,7 @@ export default function ReviewSubmissionsPage() {
 
   const submitReject = async () => {
     if (!selectedSubmission || !rejectReason.trim()) {
-      alert('请输入驳回原因');
+      toast.error('请输入驳回原因');
       return;
     }
 
@@ -168,7 +167,7 @@ export default function ReviewSubmissionsPage() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        setError('用户未登录');
+        toast.error('用户未登录');
         return;
       }
 
@@ -186,14 +185,12 @@ export default function ReviewSubmissionsPage() {
 
       if (error) throw new Error(error.message);
 
-      setSuccess('已驳回提交');
+      toast.success('已驳回提交');
       setRejectDialogOpen(false);
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      await loadSubmissions();
     } catch (err: unknown) {
       console.error('Reject error:', err);
-      setError(err instanceof Error ? err.message : '操作失败');
+      toast.error(err instanceof Error ? err.message : '操作失败');
     }
   };
 

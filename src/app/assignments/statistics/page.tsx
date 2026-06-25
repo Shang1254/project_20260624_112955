@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Users, FileText, Download, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
 
 interface Student {
   id: string;
@@ -78,10 +80,14 @@ export default function AssignmentStatisticsPage() {
   const loadStatistics = async (assignmentId: string) => {
     setIsLoading(true);
     try {
+      const supabase = await getSupabaseBrowserClientWithRetry();
+      const { data: { session } } = await supabase.auth.getSession();
+
       const response = await fetch('/api/assignments/statistics', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(session ? { 'x-session': session.access_token } : {}),
         },
         body: JSON.stringify({ assignmentId }),
       });
@@ -104,15 +110,19 @@ export default function AssignmentStatisticsPage() {
 
   const handleSendFiles = async () => {
     if (!teacherQQ) {
-      alert('请输入QQ号');
+      toast.error('请输入QQ号');
       return;
     }
 
     try {
+      const supabase = await getSupabaseBrowserClientWithRetry();
+      const { data: { session } } = await supabase.auth.getSession();
+
       const response = await fetch('/api/files/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(session ? { 'x-session': session.access_token } : {}),
         },
         body: JSON.stringify({
           assignmentId: selectedAssignment,
@@ -123,15 +133,14 @@ export default function AssignmentStatisticsPage() {
       const data = await response.json();
 
       if (response.ok) {
-        alert(`文件已准备好！请发送到 ${data.qqEmailHint}`);
-        // 打开下载链接
+        toast.success(`文件已准备好！请发送到 ${data.qqEmailHint}`);
         window.open(data.downloadUrl, '_blank');
       } else {
-        alert('发送失败：' + data.error);
+        toast.error('发送失败：' + data.error);
       }
     } catch (err) {
       console.error('Send files error:', err);
-      alert('发送失败，请稍后重试');
+      toast.error('发送失败，请稍后重试');
     }
   };
 
@@ -157,17 +166,18 @@ export default function AssignmentStatisticsPage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">选择作业</label>
-                <select
-                  className="w-full px-3 py-2 border rounded-lg"
-                  value={selectedAssignment}
-                  onChange={(e) => setSelectedAssignment(e.target.value)}
-                >
-                  {assignments.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.title} {a.due_date && `(截止: ${new Date(a.due_date).toLocaleDateString('zh-CN')})`}
-                    </option>
-                  ))}
-                </select>
+                <Select value={selectedAssignment} onValueChange={setSelectedAssignment}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择作业" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignments.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.title} {a.due_date && `(截止: ${new Date(a.due_date).toLocaleDateString('zh-CN')})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>

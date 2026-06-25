@@ -110,7 +110,7 @@ export default function RegisterPage() {
           </div>
           <CardTitle className="text-2xl font-semibold">注册账号</CardTitle>
           <CardDescription className="text-gray-600">
-            创建您的班级管理系统账号
+            武汉晴川学院 · 创建您的班级管理系统账号
           </CardDescription>
         </CardHeader>
         <CardContent>

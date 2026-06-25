@@ -3,6 +3,24 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 export async function POST(request: NextRequest) {
   try {
+    // 验证用户身份
+    const sessionToken = request.headers.get('x-session');
+    if (!sessionToken) {
+      return NextResponse.json(
+        { error: '请先登录' },
+        { status: 401 }
+      );
+    }
+
+    const authClient = getSupabaseClient(sessionToken);
+    const { data: { user }, error: authError } = await authClient.auth.getUser(sessionToken);
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: '用户验证失败' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { assignmentId } = body;
 

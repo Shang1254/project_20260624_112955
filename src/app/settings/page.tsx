@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, User } from 'lucide-react';
 import { getSupabaseBrowserClientWithRetry } from '@/lib/supabase-browser';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -16,28 +18,98 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+
+  // 个人信息
+  const [name, setName] = useState('');
+  const [qqNumber, setQqNumber] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   useEffect(() => {
     initPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function initPage() {
     const supabase = await getSupabaseBrowserClientWithRetry();
     await checkAuth(supabase);
+    await loadProfile(supabase);
     await loadApiKey(supabase);
   }
 
-  async function checkAuth(supabase: any) {
+  async function checkAuth(supabase: SupabaseClient) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       router.push('/login');
       return;
     }
-    setUser(session.user);
+    setUser({ id: session.user.id, email: session.user.email || '' });
   }
 
-  async function loadApiKey(supabase: any) {
+  async function loadProfile(supabase: SupabaseClient) {
+    setProfileLoading(true);
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('name, qq_number')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (userData) {
+        setName(userData.name || '');
+        setQqNumber(userData.qq_number || '');
+      }
+    } catch (error) {
+      console.error('加载个人信息失败:', error);
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function saveProfile() {
+    if (!name.trim()) {
+      setProfileMessage({ type: 'error', text: '姓名不能为空' });
+      return;
+    }
+
+    setProfileSaving(true);
+    setProfileMessage(null);
+
+    try {
+      const supabase = await getSupabaseBrowserClientWithRetry();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        router.push('/login');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          name: name.trim(),
+          qq_number: qqNumber.trim() || null,
+        })
+        .eq('id', authUser.id);
+
+      if (error) {
+        setProfileMessage({ type: 'error', text: '保存失败：' + error.message });
+        return;
+      }
+
+      setProfileMessage({ type: 'success', text: '个人信息已保存！' });
+    } catch (error) {
+      setProfileMessage({ type: 'error', text: '保存时发生错误' });
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
+  async function loadApiKey(supabase: SupabaseClient) {
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -115,6 +187,72 @@ export default function SettingsPage() {
             返回控制台
           </Button>
         </div>
+
+        {/* 个人信息 */}
+        <Card className="shadow-lg mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              个人信息
+            </CardTitle>
+            <CardDescription>
+              修改您的姓名和联系方式
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {profileLoading ? (
+              <div className="text-center py-6">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+              </div>
+            ) : (
+              <>
+                <div className="bg-gray-50 p-3 rounded-lg text-sm text-gray-600">
+                  <span className="font-medium">邮箱：</span>{user?.email}
+                  <span className="text-gray-400 ml-2">（邮箱不可修改）</span>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="name">姓名</Label>
+                  <Input
+                    id="name"
+                    placeholder="请输入姓名"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="qq">QQ号码</Label>
+                  <Input
+                    id="qq"
+                    placeholder="用于接收文件通知"
+                    value={qqNumber}
+                    onChange={(e) => setQqNumber(e.target.value)}
+                  />
+                </div>
+
+                {profileMessage && (
+                  <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                    profileMessage.type === 'success'
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    {profileMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                    <span className="text-sm">{profileMessage.text}</span>
+                  </div>
+                )}
+
+                <Button
+                  onClick={saveProfile}
+                  disabled={profileSaving}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {profileSaving ? '保存中...' : '保存个人信息'}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* API密钥配置 */}
         <Card className="shadow-lg">
@@ -229,16 +367,34 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* 其他设置占位 */}
+        {/* 修改密码 */}
         <Card className="mt-6 shadow-lg">
           <CardHeader>
-            <CardTitle>其他设置</CardTitle>
-            <CardDescription>更多系统配置选项（即将推出）</CardDescription>
+            <CardTitle>修改密码</CardTitle>
+            <CardDescription>更新您的登录密码</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 text-gray-500">
-              <p>更多设置功能正在开发中...</p>
-            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              修改密码需要重新验证身份，请前往 Supabase 控制台或通过邮箱重置密码。
+            </p>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const supabase = await getSupabaseBrowserClientWithRetry();
+                  const { error } = await supabase.auth.resetPasswordForEmail(user?.email || '');
+                  if (error) {
+                    toast.error('发送失败：' + error.message);
+                  } else {
+                    toast.success('重置密码邮件已发送到您的邮箱，请查收！');
+                  }
+                } catch {
+                  toast.error('发送失败，请稍后重试');
+                }
+              }}
+            >
+              发送重置密码邮件
+            </Button>
           </CardContent>
         </Card>
       </div>

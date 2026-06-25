@@ -62,7 +62,7 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-semibold">智能班级管理系统</CardTitle>
           <CardDescription className="text-gray-600">
-            教师端与学生端统一登录入口
+            武汉晴川学院 · 教师端与学生端统一登录入口
           </CardDescription>
         </CardHeader>
         <CardContent>

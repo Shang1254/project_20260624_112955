@@ -17,7 +17,9 @@ import {
   AlertCircle,
   LogOut,
   MessageSquare,
-  Settings
+  Settings,
+  Star,
+  UserPlus
 } from 'lucide-react';
 
 interface User {
@@ -53,9 +55,11 @@ export default function DashboardPage() {
   const [classes, setClasses] = useState<Class[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadData = async () => {
@@ -91,14 +95,15 @@ export default function DashboardPage() {
 
       setUser(currentUser);
 
-      // 加载班级数据
+      // 加载班级数据（使用局部变量避免 stale closure）
+      let loadedClasses: Class[] = [];
       if (currentUser.role === 'teacher') {
         const { data: classData } = await supabase
           .from('classes')
           .select('*')
           .eq('teacher_id', currentUser.id)
           .eq('is_active', true);
-        setClasses(classData || []);
+        loadedClasses = (classData || []) as Class[];
       } else {
         const { data: memberData } = await supabase
           .from('class_members')
@@ -106,16 +111,16 @@ export default function DashboardPage() {
           .eq('user_id', currentUser.id)
           .eq('is_active', true);
         
-        const studentClasses = memberData?.map(m => {
+        loadedClasses = memberData?.map(m => {
           const classData = m.classes;
           return classData as unknown as Class;
         }) || [];
-        setClasses(studentClasses);
       }
+      setClasses(loadedClasses);
 
-      // 加载作业数据
-      if (classes.length > 0) {
-        const classIds = classes.map(c => c.id);
+      // 加载作业数据（直接使用局部变量 loadedClasses）
+      if (loadedClasses.length > 0) {
+        const classIds = loadedClasses.map(c => c.id);
         const { data: assignmentData } = await supabase
           .from('assignments')
           .select('*')
@@ -123,6 +128,16 @@ export default function DashboardPage() {
           .eq('status', 'active')
           .order('due_date', { ascending: true });
         setAssignments(assignmentData || []);
+
+        // 学生端：加载已提交的作业ID
+        if (currentUser.role === 'student') {
+          const { data: submissionData } = await supabase
+            .from('submissions')
+            .select('assignment_id')
+            .eq('user_id', currentUser.id);
+          const submittedIds = new Set((submissionData || []).map(s => s.assignment_id));
+          setSubmittedAssignmentIds(submittedIds);
+        }
       }
 
     } catch (err) {
@@ -172,7 +187,7 @@ export default function DashboardPage() {
             <div>
               <h1 className="text-xl font-semibold text-gray-900">智能班级管理系统</h1>
               <p className="text-sm text-gray-500">
-                {user?.role === 'teacher' ? '教师端' : '学生端'} · {user?.name}
+                武汉晴川学院 · {user?.role === 'teacher' ? '教师端' : '学生端'} · {user?.name}
               </p>
             </div>
           </div>
@@ -275,10 +290,7 @@ export default function DashboardPage() {
                   <div className="text-2xl font-bold">
                     {user?.role === 'teacher' ? 
                       assignments.reduce((sum, a) => sum + (a.total_count || 0) - (a.submitted_count || 0), 0) :
-                      assignments.filter(a => {
-                        // 检查学生是否已提交
-                        return true; // 暂时显示为待检查
-                      }).length
+                      assignments.filter(a => !submittedAssignmentIds.has(a.id)).length
                     }
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
@@ -317,6 +329,24 @@ export default function DashboardPage() {
                     >
                       <CheckCircle2 className="w-6 h-6" />
                       <span>查看统计</span>
+                    </Button>
+                  </>
+                )}
+                {user?.role === 'student' && (
+                  <>
+                    <Button 
+                      className="h-auto py-4 flex flex-col gap-2 bg-teal-600 hover:bg-teal-700"
+                      onClick={() => router.push('/classes/join')}
+                    >
+                      <UserPlus className="w-6 h-6" />
+                      <span>加入班级</span>
+                    </Button>
+                    <Button 
+                      className="h-auto py-4 flex flex-col gap-2 bg-indigo-600 hover:bg-indigo-700"
+                      onClick={() => router.push('/submissions')}
+                    >
+                      <FileText className="w-6 h-6" />
+                      <span>我的提交</span>
                     </Button>
                   </>
                 )}
@@ -443,6 +473,14 @@ export default function DashboardPage() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
+                                onClick={() => router.push(`/assignments/${assignment.id}/grade`)}
+                              >
+                                <Star className="w-3 h-3 mr-1" />
+                                评分
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
                                 onClick={() => router.push(`/assignments/${assignment.id}/statistics`)}
                               >
                                 查看详情
@@ -452,11 +490,20 @@ export default function DashboardPage() {
                         )}
 
                         {user?.role === 'student' && (
-                          <Button 
-                            onClick={() => router.push(`/assignments/${assignment.id}/submit`)}
-                          >
-                            提交作业
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            {submittedAssignmentIds.has(assignment.id) ? (
+                              <Badge className="bg-green-600">
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                已提交
+                              </Badge>
+                            ) : null}
+                            <Button 
+                              variant={submittedAssignmentIds.has(assignment.id) ? 'outline' : 'default'}
+                              onClick={() => router.push(`/assignments/${assignment.id}/submit`)}
+                            >
+                              {submittedAssignmentIds.has(assignment.id) ? '查看/修改' : '提交作业'}
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </CardContent>
@@ -499,6 +546,23 @@ export default function DashboardPage() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-white mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="w-4 h-4 text-blue-600" />
+              <span>武汉晴川学院 · 智能班级管理系统</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span>© {new Date().getFullYear()} 武汉晴川学院</span>
+              <span className="text-gray-300">|</span>
+              <span>技术支持：计算机学院</span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

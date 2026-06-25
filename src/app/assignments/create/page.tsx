@@ -264,7 +264,6 @@ export default function CreateAssignmentPage() {
                   value={fileNameTemplate}
                   onChange={(e) => setFileNameTemplate(e.target.value)}
                   disabled={isLoading}
-                  helpText="使用占位符：学号、姓名、作业名称"
                 />
                 <p className="text-xs text-gray-500">
                   学生提交的文件必须匹配此模板。示例：2021001_张三_第一章练习题.docx

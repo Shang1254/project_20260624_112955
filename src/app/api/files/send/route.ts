@@ -7,6 +7,24 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 export async function POST(request: NextRequest) {
   try {
+    // 身份验证
+    const sessionToken = request.headers.get('x-session');
+    if (!sessionToken) {
+      return NextResponse.json(
+        { error: '请先登录' },
+        { status: 401 }
+      );
+    }
+
+    const authClient = getSupabaseClient(sessionToken);
+    const { data: { user }, error: authError } = await authClient.auth.getUser(sessionToken);
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: '用户验证失败' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { assignmentId, teacherQQ, fileName } = body;
 
@@ -80,6 +98,15 @@ export async function POST(request: NextRequest) {
 
 // 文件下载API（实际部署时需要实现）
 export async function GET(request: NextRequest) {
+  // 身份验证
+  const sessionToken = request.headers.get('x-session');
+  if (!sessionToken) {
+    return NextResponse.json(
+      { error: '请先登录' },
+      { status: 401 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const assignmentId = searchParams.get('assignmentId');
 
